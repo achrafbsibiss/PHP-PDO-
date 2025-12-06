@@ -1,0 +1,540 @@
+# 📚 TP CRUD PHP/MySQL - Documentation Complète
+
+## 🎯 Vue d'ensemble du projet
+
+Ce projet est un TP progressif qui vous guide à travers 3 étapes d'évolution d'une application CRUD (Create, Read, Update, Delete) en PHP/MySQL, depuis une approche classique jusqu'à une architecture moderne avec AJAX.
+
+---
+
+## 📊 Architecture Globale
+
+```mermaid
+graph TB
+    subgraph "Couche Présentation"
+        A[Navigateur Web]
+    end
+    
+    subgraph "Couche Application"
+        B1[Étape 1: Fichiers séparés]
+        B2[Étape 2: Fichier unique]
+        B3[Étape 3: API REST + AJAX]
+    end
+    
+    subgraph "Couche Données"
+        C[config.php]
+        D[(Base de données MySQL)]
+    end
+    
+    A -->|HTTP| B1
+    A -->|HTTP| B2
+    A -->|HTTP + AJAX| B3
+    B1 --> C
+    B2 --> C
+    B3 --> C
+    C --> D
+    
+    style A fill:#e1f5ff
+    style B1 fill:#fff4e6
+    style B2 fill:#fff4e6
+    style B3 fill:#e8f5e9
+    style C fill:#f3e5f5
+    style D fill:#fce4ec
+```
+
+---
+
+## 🗂️ Structure du Projet
+
+```mermaid
+graph LR
+    A[Racine du projet] --> B[config.php]
+    A --> C[database.sql]
+    A --> D[etape1/]
+    A --> E[etape2/]
+    A --> F[etape3/]
+    
+    D --> D1[index.php]
+    D --> D2[create.php]
+    D --> D3[view.php]
+    D --> D4[edit.php]
+    D --> D5[delete.php]
+    
+    E --> E1[index.php]
+    
+    F --> F1[index.php]
+    F --> F2[api.php]
+    
+    style A fill:#ffeb3b
+    style B fill:#4caf50
+    style C fill:#2196f3
+    style D fill:#ff9800
+    style E fill:#ff9800
+    style F fill:#ff9800
+```
+
+---
+
+## 📋 Schéma de la Base de Données
+
+```mermaid
+erDiagram
+    USERS {
+        int id PK "AUTO_INCREMENT"
+        varchar email UK "NOT NULL, UNIQUE"
+        varchar password "NOT NULL"
+        enum role "guest, author, editor, admin"
+        timestamp created_at "DEFAULT CURRENT_TIMESTAMP"
+        timestamp updated_at "ON UPDATE CURRENT_TIMESTAMP"
+    }
+```
+
+---
+
+## 🔄 Étape 1 : CRUD avec Fichiers Séparés
+
+### Flux de Navigation
+
+```mermaid
+flowchart TD
+    Start([Utilisateur]) --> Index[index.php<br/>Liste des utilisateurs]
+    
+    Index -->|Clic 'Nouvel Utilisateur'| Create[create.php<br/>Formulaire création]
+    Index -->|Clic 'Voir'| View[view.php<br/>Détails utilisateur]
+    Index -->|Clic 'Modifier'| Edit[edit.php<br/>Formulaire modification]
+    Index -->|Clic 'Supprimer'| Delete[delete.php<br/>Suppression]
+    
+    Create -->|POST Formulaire| CreateDB{Validation<br/>OK?}
+    CreateDB -->|Oui| IndexSuccess[index.php<br/>Message succès]
+    CreateDB -->|Non| Create
+    
+    Edit -->|POST Formulaire| EditDB{Validation<br/>OK?}
+    EditDB -->|Oui| IndexSuccess
+    EditDB -->|Non| Edit
+    
+    Delete --> DeleteDB[Suppression BD]
+    DeleteDB --> IndexSuccess
+    
+    View -->|Clic 'Modifier'| Edit
+    View -->|Clic 'Supprimer'| Delete
+    View -->|Clic 'Retour'| Index
+    
+    style Index fill:#e3f2fd
+    style Create fill:#fff3e0
+    style View fill:#e8f5e9
+    style Edit fill:#fff9c4
+    style Delete fill:#ffebee
+    style IndexSuccess fill:#c8e6c9
+```
+
+### Processus de Création d'Utilisateur
+
+```mermaid
+sequenceDiagram
+    participant U as Utilisateur
+    participant B as Navigateur
+    participant C as create.php
+    participant DB as Base de données
+    
+    U->>B: Clic "Nouvel Utilisateur"
+    B->>C: GET create.php
+    C->>B: Affiche formulaire
+    
+    U->>B: Remplit formulaire + Submit
+    B->>C: POST données
+    
+    C->>C: Validation email
+    C->>C: Validation password
+    C->>C: Vérification confirmation
+    
+    alt Validation OK
+        C->>C: Hachage password
+        C->>DB: INSERT INTO users
+        DB-->>C: Succès
+        C->>B: Redirect vers index.php
+        B->>U: Affiche liste + message succès
+    else Validation Échec
+        C->>B: Affiche formulaire + erreurs
+        B->>U: Erreurs affichées
+    end
+```
+
+---
+
+## 🔄 Étape 2 : CRUD dans un Seul Fichier
+
+### Architecture de Routage
+
+```mermaid
+flowchart TB
+    Start([Requête HTTP]) --> Index[index.php]
+    
+    Index --> Router{Paramètre<br/>?action=}
+    
+    Router -->|list ou vide| List[Afficher liste<br/>des utilisateurs]
+    Router -->|create| CreateForm[Afficher formulaire<br/>création]
+    Router -->|view&id=X| ViewUser[Afficher détails<br/>utilisateur X]
+    Router -->|edit&id=X| EditForm[Afficher formulaire<br/>modification]
+    
+    CreateForm -->|POST action=create| CreateProcess[Traiter création]
+    EditForm -->|POST action=update| UpdateProcess[Traiter modification]
+    List -->|POST action=delete| DeleteProcess[Traiter suppression]
+    
+    CreateProcess --> Redirect[Redirection vers<br/>?action=list]
+    UpdateProcess --> Redirect
+    DeleteProcess --> Redirect
+    
+    Redirect --> List
+    
+    style Index fill:#ffeb3b
+    style Router fill:#ff9800
+    style List fill:#e3f2fd
+    style CreateForm fill:#fff3e0
+    style ViewUser fill:#e8f5e9
+    style EditForm fill:#fff9c4
+    style CreateProcess fill:#c8e6c9
+    style UpdateProcess fill:#c8e6c9
+    style DeleteProcess fill:#ffcdd2
+```
+
+### Logique de Traitement des Actions
+
+```mermaid
+flowchart TD
+    Start([Requête reçue]) --> Method{Méthode<br/>HTTP?}
+    
+    Method -->|GET| GetAction{action=?}
+    Method -->|POST| PostAction{POST<br/>action=?}
+    
+    GetAction -->|list| QueryDB[SELECT * FROM users]
+    GetAction -->|view| QueryOne[SELECT * WHERE id=X]
+    GetAction -->|edit| QueryOne
+    GetAction -->|create| ShowForm[Afficher formulaire vide]
+    
+    PostAction -->|create| ValidateCreate{Validation<br/>données}
+    PostAction -->|update| ValidateUpdate{Validation<br/>données}
+    PostAction -->|delete| DeleteDB[DELETE FROM users]
+    
+    ValidateCreate -->|OK| InsertDB[INSERT INTO users]
+    ValidateCreate -->|Erreur| ShowFormError[Afficher formulaire<br/>+ erreurs]
+    
+    ValidateUpdate -->|OK| UpdateDB[UPDATE users]
+    ValidateUpdate -->|Erreur| ShowFormError
+    
+    InsertDB --> Success[Redirect + message succès]
+    UpdateDB --> Success
+    DeleteDB --> Success
+    
+    QueryDB --> Display[Afficher tableau]
+    QueryOne --> DisplayDetail[Afficher détails]
+    ShowForm --> DisplayForm[Afficher formulaire]
+    
+    style Method fill:#ffeb3b
+    style GetAction fill:#4caf50
+    style PostAction fill:#ff9800
+    style Success fill:#8bc34a
+```
+
+---
+
+## 🔄 Étape 3 : CRUD avec AJAX et API REST
+
+### Architecture Client-Serveur
+
+```mermaid
+flowchart LR
+    subgraph "Client (Navigateur)"
+        A[index.php<br/>Interface HTML]
+        B[JavaScript<br/>Fetch API]
+    end
+    
+    subgraph "Serveur"
+        C[api.php<br/>API REST]
+        D[(Base de données<br/>MySQL)]
+    end
+    
+    A <-->|DOM Events| B
+    B <-->|HTTP + JSON| C
+    C <-->|PDO| D
+    
+    style A fill:#e3f2fd
+    style B fill:#fff3e0
+    style C fill:#c8e6c9
+    style D fill:#ffcdd2
+```
+
+### API REST - Endpoints
+
+```mermaid
+graph TB
+    API[api.php] --> GET[GET Request]
+    API --> POST[POST Request]
+    API --> PUT[PUT Request]
+    API --> DELETE[DELETE Request]
+    
+    GET -->|Sans paramètre| GetAll[Retourne tous<br/>les utilisateurs]
+    GET -->|?id=X| GetOne[Retourne<br/>utilisateur X]
+    
+    POST --> CreateUser[Créer nouvel<br/>utilisateur]
+    PUT --> UpdateUser[Modifier<br/>utilisateur]
+    DELETE --> DeleteUser[Supprimer<br/>utilisateur]
+    
+    GetAll --> JSON1[JSON Response<br/>200 OK]
+    GetOne --> JSON2[JSON Response<br/>200 OK ou 404]
+    CreateUser --> JSON3[JSON Response<br/>201 Created]
+    UpdateUser --> JSON4[JSON Response<br/>200 OK]
+    DeleteUser --> JSON5[JSON Response<br/>200 OK]
+    
+    style API fill:#ffeb3b
+    style GET fill:#4caf50
+    style POST fill:#2196f3
+    style PUT fill:#ff9800
+    style DELETE fill:#f44336
+```
+
+### Flux AJAX - Création d'Utilisateur
+
+```mermaid
+sequenceDiagram
+    participant U as Utilisateur
+    participant UI as Interface (HTML)
+    participant JS as JavaScript
+    participant API as api.php
+    participant DB as Base de données
+    
+    U->>UI: Clic "Nouvel Utilisateur"
+    UI->>UI: Ouvre modale Bootstrap
+    
+    U->>UI: Remplit formulaire + Clic "Enregistrer"
+    UI->>JS: Événement submit
+    
+    JS->>JS: Validation côté client
+    JS->>UI: Affiche loading
+    
+    JS->>API: POST /api.php<br/>{email, password, role}
+    
+    API->>API: Validation serveur
+    API->>API: Hachage password
+    API->>DB: INSERT INTO users
+    
+    DB-->>API: Succès
+    API-->>JS: JSON {success: true}<br/>Status 201
+    
+    JS->>UI: Masque loading
+    JS->>UI: Ferme modale
+    JS->>UI: Affiche notification succès
+    JS->>JS: Appel loadUsers()
+    JS->>API: GET /api.php
+    API->>DB: SELECT * FROM users
+    DB-->>API: Liste utilisateurs
+    API-->>JS: JSON données
+    JS->>UI: Rafraîchit tableau
+    
+    Note over U,DB: Tout se passe sans rechargement de page!
+```
+
+### Flux AJAX - Modification d'Utilisateur
+
+```mermaid
+sequenceDiagram
+    participant U as Utilisateur
+    participant UI as Interface
+    participant JS as JavaScript
+    participant API as api.php
+    participant DB as Base de données
+    
+    U->>UI: Clic bouton "Modifier"
+    UI->>JS: Événement click(id)
+    
+    JS->>UI: Affiche loading
+    JS->>API: GET /api.php?id=X
+    API->>DB: SELECT * FROM users WHERE id=X
+    DB-->>API: Données utilisateur
+    API-->>JS: JSON {success: true, data: {...}}
+    
+    JS->>UI: Remplit modale avec données
+    JS->>UI: Ouvre modale
+    JS->>UI: Masque loading
+    
+    U->>UI: Modifie données + Clic "Enregistrer"
+    UI->>JS: Événement submit
+    
+    JS->>UI: Affiche loading
+    JS->>API: PUT /api.php<br/>{id, email, password?, role}
+    
+    API->>API: Validation
+    API->>DB: UPDATE users SET ... WHERE id=X
+    DB-->>API: Succès
+    API-->>JS: JSON {success: true}
+    
+    JS->>UI: Masque loading
+    JS->>UI: Ferme modale
+    JS->>UI: Affiche notification succès
+    JS->>JS: Rafraîchit liste
+```
+
+---
+
+## 🔐 Flux de Sécurité - Hachage de Mot de Passe
+
+```mermaid
+flowchart TD
+    Start([Utilisateur saisit mot de passe]) --> Client[Formulaire HTML]
+    
+    Client -->|POST| Server[Serveur PHP]
+    Server --> Validate{Validation<br/>longueur >= 6}
+    
+    Validate -->|Non| Error[Retourne erreur]
+    Validate -->|Oui| Hash[password_hash<br/>PASSWORD_DEFAULT]
+    
+    Hash --> Store[Stockage en BD<br/>Hash bcrypt]
+    
+    subgraph "Exemple de transformation"
+        Plain["'motdepasse123'"] --> Hashed["'$2y$10$...'<br/>(60 caractères)"]
+    end
+    
+    Store --> Success[Succès]
+    
+    style Start fill:#e3f2fd
+    style Validate fill:#fff9c4
+    style Hash fill:#c8e6c9
+    style Store fill:#4caf50
+    style Error fill:#ffcdd2
+```
+
+---
+
+## 🛡️ Flux de Validation des Données
+
+```mermaid
+flowchart TD
+    Start([Données reçues]) --> Clean[cleanInput<br/>trim, stripslashes, htmlspecialchars]
+    
+    Clean --> ValidateEmail{validateEmail}
+    ValidateEmail -->|Invalide| Error1[Erreur: Email invalide]
+    ValidateEmail -->|Valide| CheckPassword{Password<br/>>= 6 caractères?}
+    
+    CheckPassword -->|Non| Error2[Erreur: Password trop court]
+    CheckPassword -->|Oui| CheckConfirm{Password ==<br/>Confirm?}
+    
+    CheckConfirm -->|Non| Error3[Erreur: Passwords différents]
+    CheckConfirm -->|Oui| CheckRole{Role valide?}
+    
+    CheckRole -->|Non| Error4[Erreur: Role invalide]
+    CheckRole -->|Oui| Prepare[Requête préparée PDO]
+    
+    Prepare --> Execute{Exécution<br/>requête}
+    Execute -->|Duplicate email| Error5[Erreur: Email existe déjà]
+    Execute -->|Succès| Success[✓ Données enregistrées]
+    
+    Error1 --> DisplayErrors[Afficher erreurs]
+    Error2 --> DisplayErrors
+    Error3 --> DisplayErrors
+    Error4 --> DisplayErrors
+    Error5 --> DisplayErrors
+    
+    style Clean fill:#e3f2fd
+    style Success fill:#c8e6c9
+    style DisplayErrors fill:#ffcdd2
+```
+
+---
+
+## 🔄 Comparaison des 3 Étapes
+
+```mermaid
+graph TB
+    subgraph "Étape 1: Fichiers Séparés"
+        A1[index.php] --> A2[create.php]
+        A1 --> A3[view.php]
+        A1 --> A4[edit.php]
+        A1 --> A5[delete.php]
+        A2 -->|Redirect| A1
+        A4 -->|Redirect| A1
+        A5 -->|Redirect| A1
+    end
+    
+    subgraph "Étape 2: Fichier Unique"
+        B1[index.php?action=list]
+        B1 --> B2[?action=create]
+        B1 --> B3[?action=view]
+        B1 --> B4[?action=edit]
+        B2 -->|Redirect| B1
+        B4 -->|Redirect| B1
+    end
+    
+    subgraph "Étape 3: AJAX + API"
+        C1[index.php<br/>Interface statique]
+        C2[JavaScript<br/>Fetch API]
+        C3[api.php<br/>Endpoints REST]
+        C1 <-->|Events| C2
+        C2 <-->|JSON| C3
+    end
+    
+    style A1 fill:#ffcdd2
+    style B1 fill:#fff9c4
+    style C1 fill:#c8e6c9
+    style C2 fill:#bbdefb
+    style C3 fill:#c5cae9
+```
+
+---
+
+## 📊 Matrice de Fonctionnalités
+
+| Fonctionnalité | Étape 1 | Étape 2 | Étape 3 |
+|----------------|---------|---------|---------|
+| **Rechargement page** | ✅ Oui | ✅ Oui | ❌ Non (AJAX) |
+| **Nombre de fichiers** | 5 fichiers | 1 fichier | 2 fichiers |
+| **Validation serveur** | ✅ | ✅ | ✅ |
+| **Validation client** | ⚠️ HTML5 | ⚠️ HTML5 | ✅ JavaScript |
+| **Messages flash** | ✅ GET params | ✅ GET params | ✅ Notifications |
+| **Interface utilisateur** | Bootstrap | Bootstrap | Bootstrap + Modales |
+| **Expérience utilisateur** | Basique | Moyenne | ⭐ Excellente |
+| **Complexité** | ⭐ Simple | ⭐⭐ Moyenne | ⭐⭐⭐ Avancée |
+| **API REST** | ❌ | ❌ | ✅ |
+| **Séparation concerns** | ⚠️ Faible | ⚠️ Moyenne | ✅ Élevée |
+
+---
+
+## 🚀 Guide de Démarrage Rapide
+
+```mermaid
+flowchart TD
+    Start([Commencer le TP]) --> Step1[1. Installer XAMPP/WAMP]
+    Step1 --> Step2[2. Créer base de données]
+    Step2 --> Step3[3. Importer database.sql]
+    Step3 --> Step4[4. Configurer config.php]
+    Step4 --> Step5[5. Tester étape 1]
+    Step5 --> Step6[6. Tester étape 2]
+    Step6 --> Step7[7. Tester étape 3]
+    Step7 --> Done([✓ TP Terminé!])
+    
+    style Start fill:#4caf50
+    style Done fill:#8bc34a
+```
+
+---
+
+## 📝 Conclusion
+
+Ce TP vous permet de comprendre l'évolution des architectures web PHP, depuis une approche procédurale simple jusqu'à une architecture moderne séparant le front-end (JavaScript) du back-end (API REST PHP).
+
+**Points clés à retenir:**
+- 🔒 **Sécurité**: Toujours utiliser des requêtes préparées et hasher les mots de passe
+- 🎯 **Validation**: Valider côté serveur ET client
+- 📦 **Modularité**: Séparer les responsabilités (MVC)
+- ⚡ **Performance**: AJAX améliore l'expérience utilisateur
+- 🛠️ **Évolutivité**: L'API REST permet de créer plusieurs interfaces (web, mobile, etc.)
+
+---
+
+## 📚 Ressources Complémentaires
+
+- [Documentation PHP PDO](https://www.php.net/manual/fr/book.pdo.php)
+- [Bootstrap 5 Documentation](https://getbootstrap.com/docs/5.3/)
+- [MDN Fetch API](https://developer.mozilla.org/fr/docs/Web/API/Fetch_API)
+- [REST API Best Practices](https://restfulapi.net/)
+
+---
+
+*Bon courage pour votre TP! 🚀*
